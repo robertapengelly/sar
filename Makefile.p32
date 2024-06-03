@@ -1,0 +1,25 @@
+#******************************************************************************
+# @file             Makefile.p32
+#******************************************************************************
+AS=as386
+CC=gcc386
+LD=ld386
+
+COPTS=-S -O2 -fno-common -ansi -I. -I./include -I../pdos/pdpclib -I../pdos/src -D__PDOS386__ -D__32BIT__ -D__NOBIVA__ -D__PDOS__ -Wall -Werror -ansi -m32 -pedantic
+COBJ=append.o ar.o conv.o delete.o display.o extract.o lib.o ranlib.o replace.o report.o
+
+all: clean sar.exe
+
+sar.exe: $(COBJ)
+  $(LD) -s -o sar.exe ../pdos/pdpclib/pdosst32.o $(COBJ) ../pdos/pdpclib/pdos.a
+
+.c.o:
+  $(CC) $(COPTS) -o $*.s $<
+  $(AS) -o $@ $*.s
+  rm -f $*.s
+
+clean:
+  for %f in ($(COBJ)) do ( rm -f %f )
+  
+  rm -f sar
+  rm -f sar.exe
