@@ -8,6 +8,7 @@
 #include    <string.h>
 
 #include    "ar.h"
+#include    "elks.h"
 #include    "lib.h"
 #include    "report.h"
 
@@ -22,7 +23,7 @@ typedef     signed int                  int32_t;
 #define     GET_UINT16(arr)             ((unsigned long) arr[0] | (((unsigned long) arr[1]) << 8))
 #define     GET_UINT32(arr)             ((unsigned long) arr[0] | (((unsigned long) arr[1]) << 8) | (((unsigned long) arr[2]) << 16) | (((unsigned long) arr[3]) << 24))
 
-struct aout_exec {
+/*struct aout_exec {
 
     unsigned char a_info[4];
     unsigned char a_text[4];
@@ -45,16 +46,7 @@ struct aout_nlist {
     
     unsigned char n_value[4];
 
-};
-
-struct nlist {
-
-    unsigned char n_strx[4];
-    unsigned char n_type;
-    
-    unsigned char n_value[4];
-
-};
+};*/
 
 struct strtab {
 
@@ -103,7 +95,7 @@ static int add_strtab (struct gstrtab *gstrtab, struct strtab *strtab) {
 
 }
 
-static void aout_get_symbols (void *object, long offset) {
+/*static void aout_get_symbols (void *object, long offset) {
 
     struct aout_exec *hdr = (struct aout_exec *) object;
     
@@ -157,6 +149,39 @@ static void aout_get_symbols (void *object, long offset) {
             sym_start += sizeof (nlist);
         
         }
+    
+    }
+
+}*/
+
+static void elks_get_symbols (void *object, long offset) {
+
+    struct elks_exec *hdr = (struct elks_exec *) object;
+    
+    long sym_start = sizeof (*hdr) + GET_UINT32 (hdr->a_text) + GET_UINT32 (hdr->a_data) + GET_UINT32 (hdr->a_trsize) + GET_UINT32 (hdr->a_drsize);
+    long strtab_start = sym_start + GET_UINT32 (hdr->a_syms);
+    
+    while (sym_start < strtab_start) {
+    
+        struct elks_nlist nlist;
+        memcpy (&nlist, (char *) object + sym_start, sizeof (nlist));
+        
+        if (nlist.n_type == 5 || nlist.n_type == 7 || nlist.n_type == 9) {
+        
+            struct strtab *strtab;
+            char *symname = (char *) object + strtab_start + GET_INT32 (nlist.n_strx);
+            
+            strtab = xmalloc (sizeof (*strtab));
+            strtab->length = strlen (symname);
+            
+            strtab->name = xstrdup (symname);
+            strtab->offset = offset;
+            
+            add_strtab (&gstrtab, strtab);
+        
+        }
+        
+        sym_start += sizeof (nlist);
     
     }
 
@@ -216,20 +241,12 @@ void ranlib (FILE *arfp) {
         
         }
         
-        if (!((object[0] == 0x39 || object[0] == 0x07) && object[1] == 0x01 && object[2] == 0x64 && object[3] == 0x00)) {
-        
-            free (object);
-            
-            offset += sizeof (hdr);
-            offset += bytes;
-            
-            fseek (arfp, bytes, SEEK_CUR);
-            continue;
-        
-        }
-        
-        if ((object[0] == 0x39 || object[0] == 0x07) && object[1] == 0x01 && object[2] == 0x64 && object[3] == 0x00) {
+        /*if ((object[0] == 0x39 || object[0] == 0x07) && object[1] == 0x01 && object[2] == 0x64 && object[3] == 0x00) {
             aout_get_symbols (object, offset + 8);
+        }*/
+        
+        if (object[0] == ((ELKS_MAGIC >> 8) & 0xff) && object[1] == (ELKS_MAGIC & 0xff)) {
+            elks_get_symbols (object, offset + 8);
         }
         
         free (object);
