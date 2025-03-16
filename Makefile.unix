@@ -1,13 +1,11 @@
 #******************************************************************************
 # @file             Makefile.unix
 #******************************************************************************
-OBJDIR              ?=  $(CURDIR)
 SRCDIR              ?=  $(CURDIR)
-
 VPATH               :=  $(SRCDIR)
 
 CC                  :=  gcc
-CFLAGS              :=  -D_FILE_OFFSET_BITS=64 -I$(OBJDIR) -I$(SRCDIR)/include -O2 -Wall -Werror -Wextra -ansi -pedantic -std=c90
+CFLAGS              :=  -D_FILE_OFFSET_BITS=64 -O2 -Wall -Werror -Wextra -ansi -pedantic -std=c90
 
 CSRC                :=  append.c ar.c conv.c delete.c display.c extract.c lib.c ranlib.c replace.c report.c
 
@@ -24,5 +22,6 @@ sar: $(CSRC)
 endif
 
 clean:
+
 	if [ -f sar ]; then rm -rf sar; fi
 	if [ -f sar.exe ]; then rm -rf sar.exe; fi
