@@ -44,7 +44,7 @@ void display (FILE *arfp) {
         
         for (i = 16; i >= 0; --i) {
         
-            if (temp[i] == 0x20) {
+            if (temp[i] == ' ') {
                 temp[i] = '\0';
             }
         
