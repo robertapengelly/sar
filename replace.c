@@ -17,7 +17,7 @@ void replace (FILE *arfp, const char *fname) {
     const char *name;
     char temp[17], *p, *contents;
     
-    if (fwrite ("!<arch>\x0A", 8, 1, tfp) != 1) {
+    if (fwrite ("!<arch>\n", 8, 1, tfp) != 1) {
     
         fclose (tfp);
         

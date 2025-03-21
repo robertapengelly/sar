@@ -161,9 +161,10 @@ static void elks_get_symbols (void *object, long offset) {
     long sym_start = sizeof (*hdr) + GET_UINT32 (hdr->a_text) + GET_UINT32 (hdr->a_data) + GET_UINT32 (hdr->a_trsize) + GET_UINT32 (hdr->a_drsize);
     long strtab_start = sym_start + GET_UINT32 (hdr->a_syms);
     
+    struct elks_nlist nlist;
+    
     while (sym_start < strtab_start) {
     
-        struct elks_nlist nlist;
         memcpy (&nlist, (char *) object + sym_start, sizeof (nlist));
         
         if (nlist.n_type == 5 || nlist.n_type == 7 || nlist.n_type == 9) {
@@ -273,7 +274,7 @@ void ranlib (FILE *arfp) {
     
     }
     
-    if (fwrite ("!<arch>\x0A", 8, 1, tfp) != 1) {
+    if (fwrite ("!<arch>\n", 8, 1, tfp) != 1) {
     
         fclose (tfp);
         
@@ -303,11 +304,11 @@ void ranlib (FILE *arfp) {
     len = sprintf (temp, "%d", bytes + 4);
 #endif
     
-    temp[len] = 0x20;
+    temp[len] = ' ';
     memcpy (header.size, temp, 10);
     
-    header.endsig[0] = 0x60;
-    header.endsig[1] = 0x0A;
+    header.endsig[0] = '`';
+    header.endsig[1] = '\n';
     
     if (fwrite (&header, sizeof (header), 1, tfp) != 1) {
     

@@ -29,7 +29,7 @@ void append (FILE *ofp, const char *fname) {
     
     }
     
-    memset (temp, 0x20, 16);
+    memset (temp, ' ', 16);
     temp[0] = '0';
     
     if ((p = strrchr (fname, '/'))) {
@@ -45,7 +45,7 @@ void append (FILE *ofp, const char *fname) {
     memcpy (header.name, name, len);
     
     while (len < 16) {
-        header.name[len++] = 0x20;
+        header.name[len++] = ' ';
     }
     
     memcpy (header.mtime, temp, 12);
@@ -57,12 +57,12 @@ void append (FILE *ofp, const char *fname) {
     bytes = ftell (tfp);
     
     len = sprintf (temp, "%ld", bytes);
-    temp[len] = 0x20;
+    temp[len] = ' ';
     
     memcpy (header.size, temp, 10);
     
-    header.endsig[0] = 0x60;
-    header.endsig[1] = 0x0A;
+    header.endsig[0] = '`';
+    header.endsig[1] = '\n';
     
     need_newline = (bytes % 2);
     
@@ -116,7 +116,7 @@ void append (FILE *ofp, const char *fname) {
     
     if (need_newline) {
     
-        temp[0] = 0x0A;
+        temp[0] = '\n';
         
         if (fwrite (temp, 1, 1, ofp) != 1) {
         
