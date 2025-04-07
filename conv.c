@@ -6,11 +6,18 @@
 unsigned long conv_dec (char *str, long max) {
 
     unsigned long value = 0;
+    char ch;
     
-    while (*str != ' ' && max-- > 0) {
+    while ((ch = *str)) {
     
-        value *= 10;
-        value += *str++ - '0';
+        if (ch == ' ' || max == 0) {
+            break;
+        }
+        
+        value = ((value * 10) + (ch - '0'));
+        
+        str++;
+        max--;
     
     }
     

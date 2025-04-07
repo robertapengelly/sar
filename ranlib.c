@@ -7,46 +7,18 @@
 #include    <stdlib.h>
 #include    <string.h>
 
+#include    "aout.h"
 #include    "ar.h"
+#include    "coff.h"
+#include    "elf.h"
 #include    "elks.h"
 #include    "lib.h"
 #include    "report.h"
 
-#if     INT_MAX == 32767
-typedef     signed long                 int32_t;
-#else
-typedef     signed int                  int32_t;
-#endif
-
 #define     GET_INT32(arr)              ((long) arr[0] | (((long) arr[1]) << 8) | (((long) arr[2]) << 16) | (((long) arr[3]) << 24))
-
-#define     GET_UINT16(arr)             ((unsigned long) arr[0] | (((unsigned long) arr[1]) << 8))
 #define     GET_UINT32(arr)             ((unsigned long) arr[0] | (((unsigned long) arr[1]) << 8) | (((unsigned long) arr[2]) << 16) | (((unsigned long) arr[3]) << 24))
 
-/*struct aout_exec {
-
-    unsigned char a_info[4];
-    unsigned char a_text[4];
-    unsigned char a_data[4];
-    unsigned char a_bss[4];
-    unsigned char a_syms[4];
-    unsigned char a_entry[4];
-    unsigned char a_trsize[4];
-    unsigned char a_drsize[4];
-
-};
-
-struct aout_nlist {
-
-    unsigned char n_strx[4];
-    unsigned char n_type;
-    
-    unsigned char n_other;
-    unsigned char n_desc[2];
-    
-    unsigned char n_value[4];
-
-};*/
+#define     GET_UINT16(arr)             ((unsigned long) arr[0] | (((unsigned long) arr[1]) << 8))
 
 struct strtab {
 
@@ -95,73 +67,15 @@ static int add_strtab (struct gstrtab *gstrtab, struct strtab *strtab) {
 
 }
 
-/*static void aout_get_symbols (void *object, long offset) {
+static void aout_get_symbols (void *object, long offset) {
 
     struct aout_exec *hdr = (struct aout_exec *) object;
     
     long sym_start = sizeof (*hdr) + GET_UINT32 (hdr->a_text) + GET_UINT32 (hdr->a_data) + GET_UINT32 (hdr->a_trsize) + GET_UINT32 (hdr->a_drsize);
     long strtab_start = sym_start + GET_UINT32 (hdr->a_syms);
     
-    while (sym_start < strtab_start) {
-    
-        if (hdr->a_info[0] == 0x07) {
-        
-            struct aout_nlist nlist;
-            memcpy (&nlist, (char *) object + sym_start, sizeof (nlist));
-            
-            if (nlist.n_type == 5 || nlist.n_type == 7 || nlist.n_type == 9) {
-            
-                struct strtab *strtab;
-                char *symname = (char *) object + strtab_start + GET_INT32 (nlist.n_strx);
-                
-                strtab = xmalloc (sizeof (*strtab));
-                strtab->length = strlen (symname);
-                
-                strtab->name = xstrdup (symname);
-                strtab->offset = offset;
-                
-                add_strtab (&gstrtab, strtab);
-            
-            }
-            
-            sym_start += sizeof (nlist);
-        
-        } else {
-        
-            struct nlist nlist;
-            memcpy (&nlist, (char *) object + sym_start, sizeof (nlist));
-            
-            if (nlist.n_type == 5 || nlist.n_type == 7 || nlist.n_type == 9) {
-            
-                struct strtab *strtab;
-                char *symname = (char *) object + strtab_start + GET_INT32 (nlist.n_strx);
-                
-                strtab = xmalloc (sizeof (*strtab));
-                strtab->length = strlen (symname);
-                
-                strtab->name = xstrdup (symname);
-                strtab->offset = offset;
-                
-                add_strtab (&gstrtab, strtab);
-            
-            }
-            
-            sym_start += sizeof (nlist);
-        
-        }
-    
-    }
-
-}*/
-
-static void elks_get_symbols (void *object, long offset) {
-
-    struct elks_exec *hdr = (struct elks_exec *) object;
-    
-    long sym_start = sizeof (*hdr) + GET_UINT32 (hdr->a_text) + GET_UINT32 (hdr->a_data) + GET_UINT32 (hdr->a_trsize) + GET_UINT32 (hdr->a_drsize);
-    long strtab_start = sym_start + GET_UINT32 (hdr->a_syms);
-    
-    struct elks_nlist nlist;
+    struct strtab *strtab;
+    struct aout_nlist nlist;
     
     while (sym_start < strtab_start) {
     
@@ -169,7 +83,6 @@ static void elks_get_symbols (void *object, long offset) {
         
         if (nlist.n_type == 5 || nlist.n_type == 7 || nlist.n_type == 9) {
         
-            struct strtab *strtab;
             char *symname = (char *) object + strtab_start + GET_INT32 (nlist.n_strx);
             
             strtab = xmalloc (sizeof (*strtab));
@@ -188,12 +101,197 @@ static void elks_get_symbols (void *object, long offset) {
 
 }
 
+static void elks_get_symbols (void *object, long offset) {
+
+    struct elks_exec *hdr = (struct elks_exec *) object;
+    
+    long sym_start = sizeof (*hdr) + GET_UINT32 (hdr->a_text) + GET_UINT32 (hdr->a_data) + GET_UINT32 (hdr->a_trsize) + GET_UINT32 (hdr->a_drsize);
+    long strtab_start = sym_start + GET_UINT32 (hdr->a_syms);
+    
+    struct strtab *strtab;
+    struct elks_nlist nlist;
+    
+    while (sym_start < strtab_start) {
+    
+        memcpy (&nlist, (char *) object + sym_start, sizeof (nlist));
+        
+        if (nlist.n_type == 5 || nlist.n_type == 7 || nlist.n_type == 9) {
+        
+            char *symname = (char *) object + strtab_start + GET_INT32 (nlist.n_strx);
+            
+            strtab = xmalloc (sizeof (*strtab));
+            strtab->length = strlen (symname);
+            
+            strtab->name = xstrdup (symname);
+            strtab->offset = offset;
+            
+            add_strtab (&gstrtab, strtab);
+        
+        }
+        
+        sym_start += sizeof (nlist);
+    
+    }
+
+}
+
+static void coff_get_symbols (void *object, long offset) {
+
+    struct coff_exec *hdr = (struct coff_exec *) object;
+    
+    unsigned long sym_start = GET_UINT32 (hdr->PointerToSymbolTable);
+    unsigned long sym_cnt = GET_UINT32 (hdr->NumberOfSymbols);
+    unsigned long string_table_start = sym_start + (sizeof (struct coff_symbol) * sym_cnt);
+    
+    struct coff_symbol sym;
+    
+    while (sym_cnt--) {
+    
+        memcpy (&sym, (char *) object + sym_start, sizeof (sym));
+        
+        if (sym.StorageClass[0] == 2 && GET_UINT16 (sym.SectionNumber) != 0) {
+        
+            struct strtab *strtab;
+            
+            if (sym.Name[0] != 0) {
+            
+                int i, len;
+                
+                for (i = 0, len = 0; i < 8; i++) {
+                
+                    if (sym.Name[i] == '\0') {
+                        break;
+                    }
+                    
+                    len++;
+                
+                }
+                
+                strtab = xmalloc (sizeof (*strtab));
+                strtab->length = len;
+                
+                strtab->name = xstrdup (sym.Name);
+                strtab->offset = offset;
+                
+                add_strtab (&gstrtab, strtab);
+            
+            } else {
+            
+                unsigned char offset1 = (unsigned char) sym.Name[4];
+                unsigned char offset2 = (unsigned char) sym.Name[5];
+                unsigned char offset3 = (unsigned char) sym.Name[6];
+                unsigned char offset4 = (unsigned char) sym.Name[7];
+                
+                long final_offset = (((long) offset1) | (((long) offset2) << 8) | (((long) offset3) << 16) | (((long) offset4) << 24));
+                final_offset += string_table_start;
+                
+                strtab = xmalloc (sizeof (*strtab));
+                strtab->length = strlen ((char *) object + final_offset);
+                
+                strtab->name = xstrdup ((char *) object + final_offset);
+                strtab->offset = offset;
+                
+                add_strtab (&gstrtab, strtab);
+            
+            }
+        
+        }
+        
+        sym_start += sizeof (sym);
+    
+    }
+
+}
+
+#define     GET_ELF_UINT16(arr)         (endianess ? (((unsigned long) arr[0] << 8) | (((unsigned long) arr[1]))) : ((unsigned long) arr[0] | (((unsigned long) arr[1]) << 8)))
+
+#define     GET_ELF_UINT32(arr)         (endianess ? (((unsigned long) arr[0] << 24) | (((unsigned long) arr[1]) << 16) | (((unsigned long) arr[2]) << 8) | (((unsigned long) arr[3])))                 \
+    : ((unsigned long) arr[0] | (((unsigned long) arr[1]) << 8) | (((unsigned long) arr[2]) << 16) | (((unsigned long) arr[3]) << 24)))
+
+static void elf_get_symbols (void *object, long offset, int endianess) {
+
+    struct elf_exec *hdr = (struct elf_exec *) object;
+    
+    unsigned long e_shnum = GET_ELF_UINT16 (hdr->e_shnum);
+    unsigned long e_shoff = GET_ELF_UINT32 (hdr->e_shoff);
+    unsigned long e_shentsize = GET_ELF_UINT16 (hdr->e_shentsize);
+    
+    unsigned long sh_link, sh_offset, sh_entsize, sh_size;
+    unsigned long sym_strtab_size, i, j, st_name;
+    
+    struct elf_shdr strtabhdr;
+    struct elf_shdr shdr;
+    struct elf_sym elf_symbol;
+    
+    struct strtab *strtab;
+    char *sym_strtab;
+    
+    for (i = 1; i < e_shnum; i++) {
+    
+        memcpy (&shdr, (char *) object + e_shoff + i * e_shentsize, sizeof (shdr));
+        
+        if (GET_ELF_UINT32 (shdr.sh_type) != 2) {
+            continue;
+        }
+        
+        sh_link = GET_ELF_UINT32 (shdr.sh_link);
+        sh_offset = GET_ELF_UINT32 (shdr.sh_offset);
+        
+        if (sh_link == 0 || sh_link >= e_shnum) {
+            continue;
+        }
+        
+        memcpy (&strtabhdr, (char *) object + e_shoff + sh_link * e_shentsize, sizeof (strtabhdr));
+        
+        if (GET_ELF_UINT32 (strtabhdr.sh_type) != 3) {
+            continue;
+        }
+        
+        sym_strtab_size = GET_ELF_UINT32 (strtabhdr.sh_size);
+        sym_strtab = (char *) object + GET_ELF_UINT32 (strtabhdr.sh_offset);
+        
+        if ((sh_entsize = GET_ELF_UINT32 (shdr.sh_entsize)) < sizeof (elf_symbol)) {
+            continue;
+        }
+        
+        sh_size = GET_ELF_UINT32 (shdr.sh_size);
+        
+        for (j = 1; j < sh_size / sh_entsize; j++) {
+        
+            memcpy (&elf_symbol, (char *) object + sh_offset + j * sh_entsize, sizeof (elf_symbol));
+            
+            if ((st_name = GET_ELF_UINT32 (elf_symbol.st_name)) >= sym_strtab_size) {
+                continue;
+            }
+            
+            if (GET_ELF_UINT16 (elf_symbol.st_shndx) == 0 || (elf_symbol.st_info[0] >> 4) != 1) {
+                continue;
+            }
+            
+            if (sym_strtab[st_name] != '\0') {
+            
+                strtab = xmalloc (sizeof (*strtab));
+                strtab->offset = offset;
+                
+                strtab->name = xstrdup (sym_strtab + st_name);
+                strtab->length = strlen (strtab->name);
+                
+                add_strtab (&gstrtab, strtab);
+            
+            }
+        
+        }
+    
+    }
+
+}
+
 void ranlib (FILE *arfp) {
 
     FILE *tfp = tmpfile ();
     
     struct ar_header header;
-    int32_t bytes, i, j, len, read, val;
+    long bytes, i, j, len, read, val;
     
     unsigned char *object;
     void *contents;
@@ -242,12 +340,14 @@ void ranlib (FILE *arfp) {
         
         }
         
-        /*if ((object[0] == 0x39 || object[0] == 0x07) && object[1] == 0x01 && object[2] == 0x64 && object[3] == 0x00) {
-            aout_get_symbols (object, offset + 8);
-        }*/
-        
-        if (object[0] == ((ELKS_MAGIC >> 8) & 0xff) && object[1] == (ELKS_MAGIC & 0xff)) {
+        if (object[0] == 0x01 && object[1] == 0x03) {
             elks_get_symbols (object, offset + 8);
+        } else if (object[0] == 0x07 && object[1] == 0x01) {
+            aout_get_symbols (object, offset + 8);
+        } else if ((object[0] == 0x4C && object[1] == 0x01) || (object[0] == 0x64 && object[1] == 0x86)) {
+            coff_get_symbols (object, offset + 8);
+        } else if (object[0] == 0x7F && memcmp (object + 1, "ELF", 3) == 0) {
+            elf_get_symbols (object, offset + 8, object[5] == 2);
         }
         
         free (object);
@@ -298,11 +398,7 @@ void ranlib (FILE *arfp) {
     memcpy (header.group, temp, 6);
     memcpy (header.mode, temp, 8);
     
-#if     INT_MAX == 32767
     len = sprintf (temp, "%ld", bytes + 4);
-#else
-    len = sprintf (temp, "%d", bytes + 4);
-#endif
     
     temp[len] = ' ';
     memcpy (header.size, temp, 10);

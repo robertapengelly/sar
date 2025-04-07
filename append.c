@@ -32,7 +32,7 @@ void append (FILE *ofp, const char *fname) {
     memset (temp, ' ', 16);
     temp[0] = '0';
     
-    if ((p = strrchr (fname, '/'))) {
+    if ((p = strrchr (fname, '/')) || (p = strrchr (fname, '\\'))) {
         name = (p + 1);
     }
     
