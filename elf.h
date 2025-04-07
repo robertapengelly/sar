@@ -24,7 +24,7 @@ struct elf_exec {
 };
 
 struct elf_shdr {
-    
+
     unsigned char sh_name[4];
     unsigned char sh_type[4];
     unsigned char sh_flags[4];
