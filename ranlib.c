@@ -18,7 +18,7 @@
 #define     GET_INT32(arr)              ((long) arr[0] | (((long) arr[1]) << 8) | (((long) arr[2]) << 16) | (((long) arr[3]) << 24))
 #define     GET_UINT32(arr)             ((unsigned long) arr[0] | (((unsigned long) arr[1]) << 8) | (((unsigned long) arr[2]) << 16) | (((unsigned long) arr[3]) << 24))
 
-#define     GET_UINT16(arr)             ((unsigned long) arr[0] | (((unsigned long) arr[1]) << 8))
+#define     GET_UINT16(arr)             ((unsigned long) (arr)[0] | (((unsigned long) (arr)[1]) << 8))
 
 struct strtab {
 
@@ -286,6 +286,122 @@ static void elf_get_symbols (void *object, long offset, int endianess) {
 
 }
 
+#define     RECORD_TYPE_EXTDEF          0x8C
+#define     RECORD_TYPE_PUBDEF          0x90
+
+static void omf_get_symbols (void *object, char *filename, unsigned long bytes, long offset) {
+
+    unsigned char *pos = (unsigned char *) object;
+    
+    unsigned char record_type;
+    unsigned short record_len;
+    
+    unsigned char *pubdef_name, *pubdef_name_end;
+    unsigned char pubdef_name_len;
+    
+    unsigned char *extdef_name, *extdef_name_end;
+    unsigned char extdef_name_len;
+    
+    struct strtab *strtab;
+    int big_fields;
+    
+    while (pos < (unsigned char *) object + bytes) {
+    
+        record_type = pos[0];
+        
+        big_fields = record_type & 1;
+        record_type &= ~1;
+        
+        record_len = GET_UINT16 (pos + 1);
+        
+        {
+        
+            unsigned char checksum = 0;
+            unsigned long i;
+            
+            for (i = 0; i < (unsigned long) record_len + 3; i++) {
+                checksum += pos[i];
+            }
+            
+            if (checksum != 0) {
+                report_at (program_name, 0, REPORT_WARNING, "%s: invalid checksum", filename);
+            }
+        
+        }
+        
+        pos += 3;
+        
+        if (record_type == RECORD_TYPE_EXTDEF) {
+        
+            extdef_name_end = (extdef_name = pos) + record_len - 1;
+            
+            while (extdef_name != extdef_name_end) {
+            
+                extdef_name_len = extdef_name[0];
+                
+                if (extdef_name + 1 + extdef_name_len + 1 > extdef_name_end) {
+                
+                    report_at (program_name, 0, REPORT_FATAL_ERROR, "%s: incorrect string length", filename);
+                    exit (EXIT_FAILURE);
+                
+                }
+                
+                strtab = xmalloc (sizeof (*strtab));
+                strtab->length = extdef_name_len;
+                
+                strtab->name = xstrndup ((char *) extdef_name + 1, extdef_name_len);
+                strtab->offset = offset;
+                
+                /*report_at (program_name, 0, REPORT_WARNING, "Got length of %#x for %s", extdef_name_len, strtab->name);*/
+                
+                add_strtab (&gstrtab, strtab);
+                extdef_name = extdef_name + 1 + extdef_name_len + 1;
+            
+            }
+        
+        } else if (record_type == RECORD_TYPE_PUBDEF) {
+        
+            pubdef_name_end = (pubdef_name = pos) + record_len - 3;
+            
+            if (big_fields) {
+            
+                report_at (program_name, 0, REPORT_INTERNAL_ERROR, "%s: big fields not supported for record %#x", filename, record_type);
+                exit (EXIT_FAILURE);
+            
+            }
+            
+            while (pubdef_name != pubdef_name_end) {
+            
+                pubdef_name_len = pubdef_name[2];
+                
+                if (pubdef_name + 2 + 1 + pubdef_name_len + 1 > pubdef_name_end) {
+                
+                    report_at (program_name, 0, REPORT_FATAL_ERROR, "%s: incorrect string length", filename);
+                    exit (EXIT_FAILURE);
+                
+                }
+                
+                strtab = xmalloc (sizeof (*strtab));
+                strtab->length = pubdef_name_len;
+                
+                strtab->name = xstrndup ((char *) pubdef_name + 3, pubdef_name_len);
+                strtab->offset = offset;
+                
+                /*report_at (program_name, 0, REPORT_WARNING, "Got length of %#x for %s", pubdef_name_len, strtab->name);*/
+                
+                add_strtab (&gstrtab, strtab);
+                pubdef_name = pubdef_name + 2 + 1 + pubdef_name_len + 1;
+            
+            }
+        
+        }
+        
+        pos += record_len;
+    
+    }
+
+}
+
 void ranlib (FILE *arfp) {
 
     FILE *tfp = tmpfile ();
@@ -302,7 +418,7 @@ void ranlib (FILE *arfp) {
     for (;;) {
     
         struct ar_header hdr;
-        long bytes;
+        long bytes, actual_bytes;
         
         if (fread (&hdr, sizeof (hdr), 1, arfp) != 1) {
         
@@ -315,7 +431,7 @@ void ranlib (FILE *arfp) {
         
         }
         
-        bytes = conv_dec (hdr.size, 10);
+        actual_bytes = bytes = conv_dec (hdr.size, 10);
         
         if (bytes % 2) {
             bytes++;
@@ -348,6 +464,21 @@ void ranlib (FILE *arfp) {
             coff_get_symbols (object, offset + 8);
         } else if (object[0] == 0x7F && memcmp (object + 1, "ELF", 3) == 0) {
             elf_get_symbols (object, offset + 8, object[5] == 2);
+        } else if (object[0] == 0x80) {
+        
+            char filename[17] = { 0 };
+            memcpy (filename, hdr.name, 16);
+            
+            for (i = 16; i >= 0; --i) {
+            
+                if (filename[i] == ' ') {
+                    filename[i] = '\0';
+                }
+            
+            }
+            
+            omf_get_symbols (object, filename, actual_bytes, offset + 8);
+        
         }
         
         free (object);

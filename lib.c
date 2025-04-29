@@ -64,6 +64,15 @@ char *xstrdup (const char *__p) {
 
 }
 
+char *xstrndup (const char *__p, unsigned long __size) {
+
+    char *p = xmalloc (__size + 1);
+    
+    memcpy (p, __p, __size);
+    return p;
+
+}
+
 void parse_args (int argc, char **argv, int optind) {
 
     const char *r;
