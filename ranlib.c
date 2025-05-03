@@ -292,6 +292,7 @@ static void elf_get_symbols (void *object, long offset, int endianess) {
 static void omf_get_symbols (void *object, char *filename, unsigned long bytes, long offset) {
 
     unsigned char *pos = (unsigned char *) object;
+    unsigned char base_segment_index;
     
     unsigned char record_type;
     unsigned short record_len;
@@ -352,8 +353,6 @@ static void omf_get_symbols (void *object, char *filename, unsigned long bytes, 
                 strtab->name = xstrndup ((char *) extdef_name + 1, extdef_name_len);
                 strtab->offset = offset;
                 
-                /*report_at (program_name, 0, REPORT_WARNING, "Got length of %#x for %s", extdef_name_len, strtab->name);*/
-                
                 add_strtab (&gstrtab, strtab);
                 extdef_name = extdef_name + 1 + extdef_name_len + 1;
             
@@ -361,36 +360,38 @@ static void omf_get_symbols (void *object, char *filename, unsigned long bytes, 
         
         } else if (record_type == RECORD_TYPE_PUBDEF) {
         
-            pubdef_name_end = (pubdef_name = pos) + record_len - 3;
+            unsigned long prefix = 1;
+            unsigned long suffix = 2 + 1;
+            
+            pubdef_name_end = pos + record_len - 1;
             
             if (big_fields) {
+                suffix += 2;
+            }
             
-                report_at (program_name, 0, REPORT_INTERNAL_ERROR, "%s: big fields not supported for record %#x", filename, record_type);
-                exit (EXIT_FAILURE);
+            base_segment_index = pos[1];
+            
+            if (!base_segment_index) {
+            
+                report_at (program_name, 0, REPORT_WARNING, "%s: PUBDEF Base Frame is not supported", filename);
+                prefix += 2;
             
             }
             
+            pubdef_name = pos + 2;
+            
             while (pubdef_name != pubdef_name_end) {
             
-                pubdef_name_len = pubdef_name[2];
-                
-                if (pubdef_name + 2 + 1 + pubdef_name_len + 1 > pubdef_name_end) {
-                
-                    report_at (program_name, 0, REPORT_FATAL_ERROR, "%s: incorrect string length", filename);
-                    exit (EXIT_FAILURE);
-                
-                }
+                pubdef_name_len = pubdef_name[prefix - 1];
                 
                 strtab = xmalloc (sizeof (*strtab));
                 strtab->length = pubdef_name_len;
                 
-                strtab->name = xstrndup ((char *) pubdef_name + 3, pubdef_name_len);
+                strtab->name = xstrndup ((char *) pubdef_name + prefix, pubdef_name_len);
                 strtab->offset = offset;
                 
-                /*report_at (program_name, 0, REPORT_WARNING, "Got length of %#x for %s", pubdef_name_len, strtab->name);*/
-                
                 add_strtab (&gstrtab, strtab);
-                pubdef_name = pubdef_name + 2 + 1 + pubdef_name_len + 1;
+                pubdef_name = pubdef_name + prefix + pubdef_name_len + suffix;
             
             }
         
