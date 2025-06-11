@@ -408,13 +408,19 @@ void ranlib (FILE *arfp) {
     FILE *tfp = tmpfile ();
     
     struct ar_header header;
-    long bytes, i, j, len, read, val;
+    long i, j, len, read, val;
     
     unsigned char *object;
     void *contents;
     
     char temp[16];
     long offset = 0;
+    
+#if     UINT_MAX == 65536
+    long bytes;
+#else
+    int bytes;
+#endif
     
     for (;;) {
     
@@ -530,7 +536,11 @@ void ranlib (FILE *arfp) {
     memcpy (header.group, temp, 6);
     memcpy (header.mode, temp, 8);
     
+#if     UINT_MAX == 65536
     len = sprintf (temp, "%ld", bytes + 4);
+#else
+    len = sprintf (temp, "%d", bytes + 4);
+#endif
     
     temp[len] = ' ';
     memcpy (header.size, temp, 10);
