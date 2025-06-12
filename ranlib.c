@@ -286,6 +286,140 @@ static void elf_get_symbols (void *object, long offset, int endianess) {
 
 }
 
+unsigned long array_to_integer (unsigned char *arr, int size) {
+
+    unsigned long value = 0;
+    int i, j;
+    
+    for (i = size, j = 0; i > 0; i--, j++) {
+        value |= arr[j] << (CHAR_BIT * (i - 1));
+    }
+    
+    return value;
+
+}
+
+static void hunk_get_symbols (void *object, unsigned long bytes, long offset) {
+
+    unsigned char *pos = (unsigned char *) object + 4;
+    unsigned long name_size, size;
+    
+    struct strtab *strtab;
+    
+    name_size = array_to_integer (pos, 4);
+    name_size *= 4;
+    
+    pos = pos + 4 + name_size;
+    
+    while (pos < (unsigned char *) object + bytes) {
+    
+        if (pos[2] == 0x03 && pos[3] == 0xE7){
+            break;
+        }
+        
+        if (pos[2] == 0x03 && pos[3] == 0xF2) {
+        
+            pos += 4;
+            continue;
+        
+        }
+        
+        if (pos[2] == 0x03 && (pos[3] == 0xE8 || pos[3] == 0xE9 || pos[3] == 0xEA || pos[3] == 0xEB)) {
+        
+            pos += 4;
+            
+            if (pos[3] != 0xEB) {
+            
+                size = array_to_integer (pos, 4);
+                size *= 4;
+                
+                pos = pos + 4 + size;
+            
+            }
+            
+            continue;
+        
+        }
+        
+        if (pos[2] == 0x03 && pos[3] == 0xEF) {
+        
+            unsigned char symbol_type;
+            unsigned long num_ref;
+            
+            char *symname;
+            pos += 4;
+            
+            while (1) {
+            
+                name_size = array_to_integer (pos, 4);
+                pos += 4;
+                
+                if (name_size == 0) {
+                    break;
+                }
+                
+                symbol_type = (name_size >> 24) & 0xff;
+                
+                name_size &= 0xffffff;
+                name_size *= 4;
+                
+                symname = xstrndup ((char *) pos, name_size);
+                pos += name_size;
+                
+                if (symbol_type == 1 || symbol_type == 2) {
+                    pos += 4;
+                } else if (symbol_type == 129 || symbol_type == 130 || symbol_type == 136) {
+                
+                    if (symbol_type == 130) {
+                        pos += 4;
+                    }
+                    
+                    num_ref = array_to_integer (pos, 4);
+                    num_ref *= 4;
+                    
+                    pos = pos + 4 + num_ref;
+                
+                }
+                
+                strtab = xmalloc (sizeof (*strtab));
+                strtab->length = strlen (symname);
+                
+                strtab->name = symname;
+                strtab->offset = offset;
+                
+                add_strtab (&gstrtab, strtab);
+            
+            }
+            
+            continue;
+        
+        }
+        
+        if (pos[2] == 0x03 && pos[3] == 0xEC) {
+        
+            pos += 4;
+            
+            while (1) {
+            
+                size = array_to_integer (pos, 4) * 4;
+                pos += 4;
+                
+                if (size == 0) {
+                    break;
+                }
+                
+                pos = pos + size + 4;
+            
+            }
+            
+            continue;
+        
+        }
+    
+    }
+
+}
+
 #define     RECORD_TYPE_EXTDEF          0x8C
 #define     RECORD_TYPE_PUBDEF          0x90
 
@@ -463,7 +597,9 @@ void ranlib (FILE *arfp) {
         
         }
         
-        if (object[0] == 0x01 && object[1] == 0x03) {
+        if (object[2] == 0x03 && object[3] == 0xE7) {
+            hunk_get_symbols (object, actual_bytes, offset + 8);
+        } else if (object[0] == 0x01 && object[1] == 0x03) {
             elks_get_symbols (object, offset + 8);
         } else if (object[0] == 0x07 && object[1] == 0x01) {
             aout_get_symbols (object, offset + 8);
