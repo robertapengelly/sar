@@ -367,7 +367,21 @@ static void hunk_get_symbols (void *object, unsigned long bytes, long offset) {
                 pos += name_size;
                 
                 if (symbol_type == 1 || symbol_type == 2) {
+                
+                    if (symbol_type == 1) {
+                    
+                        strtab = xmalloc (sizeof (*strtab));
+                        strtab->length = strlen (symname);
+                        
+                        strtab->name = xstrdup (symname);
+                        strtab->offset = offset;
+                        
+                        add_strtab (&gstrtab, strtab);
+                    
+                    }
+                    
                     pos += 4;
+                
                 } else if (symbol_type == 129 || symbol_type == 130 || symbol_type == 136) {
                 
                     if (symbol_type == 130) {
@@ -380,14 +394,6 @@ static void hunk_get_symbols (void *object, unsigned long bytes, long offset) {
                     pos = pos + 4 + num_ref;
                 
                 }
-                
-                strtab = xmalloc (sizeof (*strtab));
-                strtab->length = strlen (symname);
-                
-                strtab->name = symname;
-                strtab->offset = offset;
-                
-                add_strtab (&gstrtab, strtab);
             
             }
             
