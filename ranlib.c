@@ -556,7 +556,7 @@ void ranlib (FILE *arfp) {
     char temp[16];
     long offset = 0;
     
-#if     UINT_MAX == 65536
+#if     UINT_MAX == 65535
     long bytes;
 #else
     int bytes;
@@ -678,7 +678,7 @@ void ranlib (FILE *arfp) {
     memcpy (header.group, temp, 6);
     memcpy (header.mode, temp, 8);
     
-#if     UINT_MAX == 65536
+#if     UINT_MAX == 65535
     len = sprintf (temp, "%ld", bytes + 4);
 #else
     len = sprintf (temp, "%d", bytes + 4);
