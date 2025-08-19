@@ -3,6 +3,7 @@
  *****************************************************************************/
 #include    <limits.h>
 #include    <stddef.h>
+#include    <stdint.h>
 #include    <stdio.h>
 #include    <stdlib.h>
 #include    <string.h>
@@ -15,10 +16,10 @@
 #include    "lib.h"
 #include    "report.h"
 
-#define     GET_INT32(arr)              ((long) arr[0] | (((long) arr[1]) << 8) | (((long) arr[2]) << 16) | (((long) arr[3]) << 24))
-#define     GET_UINT32(arr)             ((unsigned long) arr[0] | (((unsigned long) arr[1]) << 8) | (((unsigned long) arr[2]) << 16) | (((unsigned long) arr[3]) << 24))
+#define     GET_INT32(arr)              ((int32_t) (arr)[0] | (((int32_t) (arr)[1]) << 8) | (((int32_t) (arr)[2]) << 16) | (((int32_t) (arr)[3]) << 24))
+#define     GET_UINT32(arr)             ((uint32_t) (arr)[0] | (((uint32_t) (arr)[1]) << 8) | (((uint32_t) (arr)[2]) << 16) | (((uint32_t) (arr)[3]) << 24))
 
-#define     GET_UINT16(arr)             ((unsigned long) (arr)[0] | (((unsigned long) (arr)[1]) << 8))
+#define     GET_UINT16(arr)             ((uint32_t) (arr)[0] | (((uint32_t) (arr)[1]) << 8))
 
 struct strtab {
 
@@ -182,7 +183,7 @@ static void coff_get_symbols (void *object, long offset) {
                 unsigned char offset3 = (unsigned char) sym.Name[6];
                 unsigned char offset4 = (unsigned char) sym.Name[7];
                 
-                long final_offset = (((long) offset1) | (((long) offset2) << 8) | (((long) offset3) << 16) | (((long) offset4) << 24));
+                long final_offset = ((uint32_t) offset1 | (((uint32_t) offset2) << 8) | (((uint32_t) offset3) << 16) | (((uint32_t) offset4) << 24));
                 final_offset += string_table_start;
                 
                 strtab = xmalloc (sizeof (*strtab));
@@ -203,25 +204,25 @@ static void coff_get_symbols (void *object, long offset) {
 
 }
 
-#define     GET_ELF_UINT16(arr)         (endianess ? (((unsigned long) arr[0] << 8) | (((unsigned long) arr[1]))) : ((unsigned long) arr[0] | (((unsigned long) arr[1]) << 8)))
+#define     GET_ELF_UINT16(arr)         (endianess ? (((uint32_t) (arr)[0] << 8) | (((uint32_t) (arr)[1]))) : ((uint32_t) (arr)[0] | (((uint32_t) (arr)[1]) << 8)))
 
-#define     GET_ELF_UINT32(arr)         (endianess ? (((unsigned long) arr[0] << 24) | (((unsigned long) arr[1]) << 16) | (((unsigned long) arr[2]) << 8) | (((unsigned long) arr[3])))                 \
-    : ((unsigned long) arr[0] | (((unsigned long) arr[1]) << 8) | (((unsigned long) arr[2]) << 16) | (((unsigned long) arr[3]) << 24)))
+#define     GET_ELF_UINT32(arr)         (endianess ? (((uint32_t) (arr)[0] << 24) | (((uint32_t) (arr)[1]) << 16) | (((uint32_t) (arr)[2]) << 8) | (((uint32_t) (arr)[3])))                 \
+    : ((uint32_t) (arr)[0] | (((uint32_t) (arr)[1]) << 8) | (((uint32_t) (arr)[2]) << 16) | (((uint32_t) (arr)[3]) << 24)))
 
-static void elf_get_symbols (void *object, long offset, int endianess) {
+static void elf32_get_symbols (void *object, long offset, int endianess) {
 
-    struct elf_exec *hdr = (struct elf_exec *) object;
+    struct elf32_exec *hdr = (struct elf32_exec *) object;
     
-    unsigned long e_shnum = GET_ELF_UINT16 (hdr->e_shnum);
-    unsigned long e_shoff = GET_ELF_UINT32 (hdr->e_shoff);
-    unsigned long e_shentsize = GET_ELF_UINT16 (hdr->e_shentsize);
+    uint16_t e_shnum = GET_ELF_UINT16 (hdr->e_shnum);
+    uint32_t e_shoff = GET_ELF_UINT32 (hdr->e_shoff);
+    uint16_t e_shentsize = GET_ELF_UINT16 (hdr->e_shentsize);
     
-    unsigned long sh_link, sh_offset, sh_entsize, sh_size;
-    unsigned long sym_strtab_size, i, j, st_name;
+    uint32_t sh_link, sh_offset, sh_entsize, sh_size;
+    uint32_t sym_strtab_size, i, j, st_name;
     
-    struct elf_shdr strtabhdr;
-    struct elf_shdr shdr;
-    struct elf_sym elf_symbol;
+    struct elf32_shdr strtabhdr;
+    struct elf32_shdr shdr;
+    struct elf32_sym elf_symbol;
     
     struct strtab *strtab;
     char *sym_strtab;
@@ -255,6 +256,88 @@ static void elf_get_symbols (void *object, long offset, int endianess) {
         }
         
         sh_size = GET_ELF_UINT32 (shdr.sh_size);
+        
+        for (j = 1; j < sh_size / sh_entsize; j++) {
+        
+            memcpy (&elf_symbol, (char *) object + sh_offset + j * sh_entsize, sizeof (elf_symbol));
+            
+            if ((st_name = GET_ELF_UINT32 (elf_symbol.st_name)) >= sym_strtab_size) {
+                continue;
+            }
+            
+            if (GET_ELF_UINT16 (elf_symbol.st_shndx) == 0 || (elf_symbol.st_info[0] >> 4) != 1) {
+                continue;
+            }
+            
+            if (sym_strtab[st_name] != '\0') {
+            
+                strtab = xmalloc (sizeof (*strtab));
+                strtab->offset = offset;
+                
+                strtab->name = xstrdup (sym_strtab + st_name);
+                strtab->length = strlen (strtab->name);
+                
+                add_strtab (&gstrtab, strtab);
+            
+            }
+        
+        }
+    
+    }
+
+}
+
+#define     GET_ELF_UINT64(arr)                                                                                                                                                                                                                 \
+    (endianess ? (((uint64_t) (arr)[0]) << 56) | (((uint64_t) (arr)[1]) << 48) | (((uint64_t) (arr)[2]) << 40) | (((uint64_t) (arr)[3]) >> 32) | (((uint64_t) (arr)[4]) << 24) | (((uint64_t) (arr)[5]) << 16) | (((uint64_t) (arr)[6]) << 8) | (((uint64_t) (arr)[7]))  \
+        : ((uint64_t) (arr)[0]) | (((uint64_t) (arr)[1]) << 8) | (((uint64_t) (arr)[2]) << 16) | (((uint64_t) (arr)[3]) << 24) | (((uint64_t) (arr)[4]) << 32) | (((uint64_t) (arr)[5]) << 40) | (((uint64_t) (arr)[6]) << 48) | (((uint64_t) (arr)[7]) << 56))
+
+static void elf64_get_symbols (void *object, long offset, int endianess) {
+
+    struct elf64_exec *hdr = (struct elf64_exec *) object;
+    
+    uint16_t e_shnum = GET_ELF_UINT16 (hdr->e_shnum);
+    uint64_t e_shoff = GET_ELF_UINT64 (hdr->e_shoff);
+    uint16_t e_shentsize = GET_ELF_UINT16 (hdr->e_shentsize);
+    
+    uint64_t sh_link, sh_offset, sh_entsize, sh_size;
+    uint64_t sym_strtab_size, i, j, st_name;
+    
+    struct elf64_shdr strtabhdr;
+    struct elf64_shdr shdr;
+    struct elf64_sym elf_symbol;
+    
+    struct strtab *strtab;
+    char *sym_strtab;
+    
+    for (i = 1; i < e_shnum; i++) {
+    
+        memcpy (&shdr, (char *) object + e_shoff + i * e_shentsize, sizeof (shdr));
+        
+        if (GET_ELF_UINT32 (shdr.sh_type) != 2) {
+            continue;
+        }
+        
+        sh_link = GET_ELF_UINT32 (shdr.sh_link);
+        sh_offset = GET_ELF_UINT64 (shdr.sh_offset);
+        
+        if (sh_link == 0 || sh_link >= e_shnum) {
+            continue;
+        }
+        
+        memcpy (&strtabhdr, (char *) object + e_shoff + sh_link * e_shentsize, sizeof (strtabhdr));
+        
+        if (GET_ELF_UINT32 (strtabhdr.sh_type) != 3) {
+            continue;
+        }
+        
+        sym_strtab_size = GET_ELF_UINT64 (strtabhdr.sh_size);
+        sym_strtab = (char *) object + GET_ELF_UINT64 (strtabhdr.sh_offset);
+        
+        if ((sh_entsize = GET_ELF_UINT64 (shdr.sh_entsize)) < sizeof (elf_symbol)) {
+            continue;
+        }
+        
+        sh_size = GET_ELF_UINT64 (shdr.sh_size);
         
         for (j = 1; j < sh_size / sh_entsize; j++) {
         
@@ -394,6 +477,8 @@ static void hunk_get_symbols (void *object, unsigned long bytes, long offset) {
                     pos = pos + 4 + num_ref;
                 
                 }
+                
+                free (symname);
             
             }
             
@@ -612,7 +697,15 @@ void ranlib (FILE *arfp) {
         } else if ((object[0] == 0x4C && object[1] == 0x01) || (object[0] == 0x64 && object[1] == 0x86)) {
             coff_get_symbols (object, offset + 8);
         } else if (object[0] == 0x7F && memcmp (object + 1, "ELF", 3) == 0) {
-            elf_get_symbols (object, offset + 8, object[5] == 2);
+        
+            int endianess = (object[5] == 2);
+
+            if (object[4] == 2) {
+                elf64_get_symbols (object, offset + 8, endianess);
+            } else {
+                elf32_get_symbols (object, offset + 8, endianess);
+            }
+        
         } else if (object[0] == 0x80) {
         
             char filename[17] = { 0 };
@@ -663,14 +756,14 @@ void ranlib (FILE *arfp) {
     
     }
     
-    memset (temp, 0x20, 16);
+    memset (temp, ' ', 16);
     temp[0] = '0';
     
     len = 1;
     memcpy (header.name, "/", len);
     
     while (len < 16) {
-        header.name[len++] = 0x20;
+        header.name[len++] = ' ';
     }
     
     memcpy (header.mtime, temp, 12);
