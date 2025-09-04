@@ -304,7 +304,7 @@ static void elf64_get_symbols (void *object, int64_t offset, int endianess) {
     
         memcpy (&shdr, (char *) object + e_shoff + i * e_shentsize, sizeof (shdr));
         
-        if (array_to_integer (shdr.sh_type, 4, endianess) != 2, 4) {
+        if (array_to_integer (shdr.sh_type, 4, endianess) != 2) {
             continue;
         }
         
