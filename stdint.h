@@ -3,9 +3,11 @@
  *****************************************************************************/
 #ifndef     _STDINT_H_INCLUDED
 #ifndef     _STDINT_H
+#ifndrf     _STDINT_H_
 
 #define     _STDINT_H_INCLUDED
 #define     _STDINT_H
+#define     _STDINT_H_
 
 #include    <limits.h>
 
@@ -31,5 +33,6 @@ typedef     signed long long            int64_t;
 typedef     unsigned long long          uint64_t;
 #endif
 
+#endif      /* _STDINT_H_
 #endif      /* _STDINT_H */
 #endif      /* _STDINT_H_INCLUDED */
