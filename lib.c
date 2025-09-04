@@ -8,6 +8,7 @@
 #include    "ar.h"
 #include    "lib.h"
 #include    "report.h"
+#include    "stdint.h"
 
 static void print_usage (void) {
 
@@ -70,6 +71,31 @@ char *xstrndup (const char *__p, unsigned long __size) {
     
     memcpy (p, __p, __size);
     return p;
+
+}
+
+uint64_t array_to_integer (unsigned char *arr, int size, int bigendian) {
+
+    uint64_t value = 0;
+    int i;
+    
+    if (bigendian) {
+    
+        int j;
+        
+        for (i = size, j = 0; i > 0; i--, j++) {
+            value |= arr[j] << (CHAR_BIT * (i - 1));
+        }
+    
+    } else {
+    
+        for (i = 0; i < size; i++) {
+            value |= arr[i] << (CHAR_BIT * i);
+        }
+    
+    }
+    
+    return value;
 
 }
 
