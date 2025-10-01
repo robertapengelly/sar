@@ -85,7 +85,7 @@ uint64_t array_to_integer (unsigned char *arr, int size, int bigendian) {
         int j;
         
         for (i = size, j = 0; i > 0; i--, j++) {
-            value |= arr[j] << (CHAR_BIT * (i - 1));
+            value |= (uint64_t) arr[j] << (CHAR_BIT * (i - 1));
         }
     
     } else {
