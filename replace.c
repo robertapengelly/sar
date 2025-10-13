@@ -11,7 +11,7 @@
 
 void replace (FILE *arfp, const char *fname) {
 
-    FILE *tfp = tmpfile ();
+    FILE *tfp = get_temp_file ();
     long bytes, len, read;
     
     const char *name;

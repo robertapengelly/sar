@@ -624,7 +624,7 @@ static void omf_get_symbols (void *object, char *filename, uint64_t bytes, int64
 
 void ranlib (FILE *arfp) {
 
-    FILE *tfp = tmpfile ();
+    FILE *tfp = get_temp_file ();
     
     struct ar_header header;
     long i, j, len, read, val;

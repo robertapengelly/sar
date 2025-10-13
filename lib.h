@@ -15,4 +15,7 @@ void parse_args (int argc, char **argv, int optind);
 void *xmalloc (unsigned long __size);
 void *xrealloc (void *__ptr, unsigned long __size);
 
+#include    <stdio.h>
+FILE *get_temp_file (void);
+
 #endif      /* _LIB_H */

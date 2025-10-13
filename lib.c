@@ -1,6 +1,12 @@
 /******************************************************************************
  * @file            lib.c
  *****************************************************************************/
+#if     defined (unix) || defined (__unix) || defined (__unix__) || defined (__APPLE__)
+# ifndef    _POSIX_C_SOURCE
+#  define       _POSIX_C_SOURCE         200809L
+# endif
+#endif
+
 #include    <limits.h>
 #include    <stdio.h>
 #include    <stdlib.h>
@@ -262,3 +268,49 @@ void *xrealloc (void *__ptr, unsigned long __size) {
     return ptr;
 
 }
+
+
+#if     defined (unix) || defined (__unix) || defined (__unix__) || defined (__APPLE__)
+FILE *get_temp_file (void) {
+
+    char *temp_path = "/tmp", *template;
+    int fd;
+    
+    template = xmalloc (strlen (temp_path) + 1 + 10 + 1);
+    sprintf (template, "%s/sarXXXXXX", temp_path);
+    
+    if (!(fd = mkstemp (template))) {
+        return 0;
+    }
+    
+    return fdopen (fd, "w+b");
+
+}
+#elif   defined (_WIN32)
+# include   <windows.h>
+
+# ifndef    MAX_PATH
+#  define       MAX_PATH                206
+# endif
+
+FILE *get_temp_file (void) {
+
+    char temp_path[MAX_PATH + 1] = { 0 };
+    char full_path[MAX_PATH + 1] = { 0 };
+    
+    if (!GetTempPath (MAX_PATH + 1, temp_path)) {
+        return 0;
+    }
+    
+    if (!GetTempFileName (temp_path, "sar", 0, full_path)) {
+        return 0;
+    }
+    
+    return fopen (full_path, "w+b");
+
+}
+#else
+FILE *get_temp_file (void) {
+    return tmpfile ();
+}
+#endif
