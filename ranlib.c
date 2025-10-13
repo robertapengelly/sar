@@ -745,7 +745,7 @@ void ranlib (FILE *arfp) {
     
         fclose (tfp);
         
-        report_at (program_name, 0, REPORT_ERROR, "failed whist writing ar header");
+        report_at (program_name, 0, REPORT_ERROR, "failed whilst writing ar header");
         return;
     
     }
@@ -959,7 +959,7 @@ void ranlib (FILE *arfp) {
             free (contents);
             fclose (tfp);
             
-            report_at (program_name, 0, REPORT_ERROR, "failed whist writing %s", state->outfile);
+            report_at (program_name, 0, REPORT_ERROR, "failed whilst writing %s", state->outfile);
             exit (EXIT_FAILURE);
         
         }
