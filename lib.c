@@ -273,8 +273,12 @@ void *xrealloc (void *__ptr, unsigned long __size) {
 #if     defined (unix) || defined (__unix) || defined (__unix__) || defined (__APPLE__)
 FILE *get_temp_file (void) {
 
-    char *temp_path = "/tmp", *template;
+    char *temp_path, *template;
     int fd;
+    
+    if (!(temp_path = getenv ("TMPDIR"))) {
+        temp_path = "/tmp";
+    }
     
     template = xmalloc (strlen (temp_path) + 1 + 10 + 1);
     sprintf (template, "%s/sarXXXXXX", temp_path);
