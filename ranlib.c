@@ -13,6 +13,7 @@
 #include    "elf.h"
 #include    "elks.h"
 #include    "lib.h"
+#include    "macho.h"
 #include    "report.h"
 #include    "stdint.h"
 
@@ -505,6 +506,96 @@ static void hunk_get_symbols (void *object, uint64_t bytes, int64_t offset) {
 
 }
 
+static void macho_get_symbols (void *object, int64_t offset) {
+
+    unsigned char *pos = (unsigned char *) object;
+    
+    struct macho_header_64 *header;
+    struct strtab *strtab;
+    
+    struct symtab_command *symtab_cmd;
+    struct load_command *load_command;
+    
+    unsigned long cpu_type, num_commands, num_syms;
+    unsigned long i, j;
+    
+    unsigned char *sym_pos;
+    char *string_table, *symbol_name;
+    
+    struct nlist_64 *nlist_64;
+    unsigned long n_strx;
+    
+    header = (struct macho_header_64 *) pos;
+    pos += sizeof (*header);
+    
+    cpu_type = array_to_integer (header->cpu_type, 4, 0);
+    
+    if (cpu_type != MH_CPU_TYPE_AMD64 && cpu_type != MH_CPU_TYPE_ARM64) {
+        return;
+    }
+    
+    if (array_to_integer (header->file_type, 4, 0) != MH_OBJECT) {
+        return;
+    }
+    
+    num_commands = array_to_integer (header->num_cmds, 4, 0);
+    
+    for (i = 0; i < num_commands; i++) {
+    
+        load_command = (struct load_command *) pos;
+        
+        if (array_to_integer (load_command->command, 4, 0) == LC_SYMTAB) {
+        
+            symtab_cmd = (struct symtab_command *) pos;
+            
+            if (!(num_syms = array_to_integer (symtab_cmd->num_symbols, 4, 0))) {
+            
+                pos += array_to_integer (load_command->command_size, 4, 0);
+                continue;
+            
+            }
+            
+            string_table = (char *) object + array_to_integer (symtab_cmd->string_offset, 4, 0);
+            sym_pos = (unsigned char *) object + array_to_integer (symtab_cmd->symbol_offset, 4, 0);
+            
+            for (j = 0; j < num_syms; j++) {
+            
+                nlist_64 = (struct nlist_64 *) (sym_pos + j * sizeof (*nlist_64));
+                
+                if ((n_strx = array_to_integer (nlist_64->n_strx, 4, 0)) < array_to_integer (symtab_cmd->string_size, 4, 0)) {
+                
+                    if (string_table[n_strx] != '\0') {
+                    
+                        symbol_name = xstrdup (string_table + n_strx);
+                        
+                        if (nlist_64->n_type[0] & MACHO_N_EXT) {
+                        
+                            strtab = xmalloc (sizeof (*strtab));
+                            strtab->offset = offset;
+                            
+                            strtab->name = symbol_name;
+                            strtab->length = strlen (strtab->name);
+                            
+                            add_strtab (&gstrtab, strtab);
+                        
+                        }
+                    
+                    }
+                
+                }
+            
+            }
+            
+            break;
+        
+        }
+        
+        pos += array_to_integer (load_command->command_size, 4, 0);
+    
+    }
+
+}
+
 #define     RECORD_TYPE_EXTDEF          0x8C
 #define     RECORD_TYPE_PUBDEF          0x90
 
@@ -693,13 +784,15 @@ void ranlib (FILE *arfp) {
         } else if (object[0] == 0x7F && memcmp (object + 1, "ELF", 3) == 0) {
         
             int endianess = (object[5] == 2);
-
+            
             if (object[4] == 2) {
                 elf64_get_symbols (object, offset + 8, endianess);
             } else {
                 elf32_get_symbols (object, offset + 8, endianess);
             }
         
+        } else if (object[0] == 0xCF && object[1] == 0xFA && object[2] == 0xED && object[3] == 0xFE) {
+            macho_get_symbols (object, offset + 8);
         } else if (object[0] == 0x80) {
         
             char filename[17] = { 0 };
