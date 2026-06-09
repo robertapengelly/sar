@@ -715,8 +715,6 @@ static void omf_get_symbols (void *object, char *filename, uint64_t bytes, int64
 
 void ranlib (FILE *arfp) {
 
-    FILE *tfp = get_temp_file ();
-    
     struct ar_header header;
     long i, j, len, read, val;
     
@@ -726,11 +724,20 @@ void ranlib (FILE *arfp) {
     char temp[16];
     long offset = 0;
     
+    FILE *tfp;
+    
 #if     UINT_MAX == 65535
     long bytes;
 #else
     int bytes;
 #endif
+    
+    if (!(tfp = sar_tmpfile ())) {
+    
+        report_at (program_name, 0, REPORT_ERROR, "failed to create temp file");
+        return;
+    
+    }
     
     for (;;) {
     
@@ -765,9 +772,9 @@ void ranlib (FILE *arfp) {
         
         if (fread (object, bytes, 1, arfp) != 1) {
         
-            free (object);
-            
             report_at (program_name, 0, REPORT_ERROR, "failed to read %ld bytes from %s", bytes, state->outfile);
+            
+            free (object);
             exit (EXIT_FAILURE);
             
         
@@ -836,9 +843,9 @@ void ranlib (FILE *arfp) {
     
     if (fwrite ("!<arch>\n", 8, 1, tfp) != 1) {
     
-        fclose (tfp);
-        
         report_at (program_name, 0, REPORT_ERROR, "failed whilst writing ar header");
+        
+        sar_close (tfp);
         return;
     
     }
@@ -872,9 +879,9 @@ void ranlib (FILE *arfp) {
     
     if (fwrite (&header, sizeof (header), 1, tfp) != 1) {
     
-        fclose (tfp);
-        
         report_at (program_name, 0, REPORT_ERROR, "failed whilst writing header");
+        
+        sar_close (tfp);
         return;
     
     }
@@ -960,9 +967,9 @@ void ranlib (FILE *arfp) {
         
         if (fwrite (&hdr, sizeof (hdr), 1, tfp) != 1) {
         
-            fclose (tfp);
-            
             report_at (program_name, 0, REPORT_ERROR, "failed whilst writing header");
+            
+            sar_close (tfp);
             exit (EXIT_FAILURE);
         
         }
@@ -981,10 +988,11 @@ void ranlib (FILE *arfp) {
             
             if (fread (contents, read, 1, arfp) != 1) {
             
-                free (contents);
-                fclose (tfp);
-                
                 report_at (program_name, 0, REPORT_ERROR, "failed to read %ld bytes from %s", bytes, state->outfile);
+                
+                sar_close (tfp);
+                free (contents);
+                
                 exit (EXIT_FAILURE);
             
             }
@@ -993,10 +1001,11 @@ void ranlib (FILE *arfp) {
             
             if (fwrite (contents, read, 1, tfp) != 1) {
             
-                free (contents);
-                fclose (tfp);
-                
                 report_at (program_name, 0, REPORT_ERROR, "failed to write temp file");
+                
+                sar_close (tfp);
+                free (contents);
+                
                 exit (EXIT_FAILURE);
             
             }
@@ -1012,9 +1021,9 @@ void ranlib (FILE *arfp) {
     
     if ((arfp = fopen (state->outfile, "w+b")) == NULL) {
     
-        fclose (tfp);
-        
         report_at (program_name, 0, REPORT_ERROR, "failed to open %s for writing", state->outfile);
+        
+        sar_close (tfp);
         exit (EXIT_FAILURE);
     
     }
@@ -1037,10 +1046,11 @@ void ranlib (FILE *arfp) {
         
         if (fread (contents, read, 1, tfp) != 1) {
             
-            free (contents);
-            fclose (tfp);
-            
             report_at (program_name, 0, REPORT_ERROR, "failed whilst reading temp file");
+            
+            sar_close (tfp);
+            free (contents);
+            
             return;
         
         }
@@ -1049,17 +1059,18 @@ void ranlib (FILE *arfp) {
         
         if (fwrite (contents, read, 1, arfp) != 1) {
         
-            free (contents);
-            fclose (tfp);
-            
             report_at (program_name, 0, REPORT_ERROR, "failed whilst writing %s", state->outfile);
+            
+            sar_close (tfp);
+            free (contents);
+            
             exit (EXIT_FAILURE);
         
         }
     
     }
     
+    sar_close (tfp);
     free (contents);
-    fclose (tfp);
 
 }

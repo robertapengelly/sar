@@ -271,9 +271,26 @@ void *xrealloc (void *__ptr, unsigned long __size) {
 
 
 #if     defined (unix) || defined (__unix) || defined (__unix__) || defined (__APPLE__)
-FILE *get_temp_file (void) {
+# include       <unistd.h>
+# include       "hashtab.h"
 
-    char *temp_path, *template;
+struct temp_file {
+
+    char *name, *path;
+    FILE *fp;
+
+};
+
+static struct hashtab hashtab_tmpfiles = { 0 };
+
+FILE *sar_tmpfile (void) {
+
+    char *temp_path, *template, *name, *p;
+    
+    struct hashtab_name *key;
+    struct temp_file *tmp;
+    
+    FILE *fp;
     int fd;
     
     if (!(temp_path = getenv ("TMPDIR"))) {
@@ -281,40 +298,434 @@ FILE *get_temp_file (void) {
     }
     
     template = xmalloc (strlen (temp_path) + 1 + 10 + 1);
+    
+again:
+    
     sprintf (template, "%s/sarXXXXXX", temp_path);
     
-    if (!(fd = mkstemp (template))) {
+    if ((fd = mkstemp (template)) < 0) {
         return 0;
     }
     
-    return fdopen (fd, "w+b");
+    if ((p = strrchr (template, '/'))) {
+        name = xstrdup (p + 1);
+    } else {
+        name = xstrdup (template);
+    }
+    
+    if ((key = hashtab_get_key (&hashtab_tmpfiles, name))) {
+    
+        close (fd);
+        
+        remove (template);
+        free (name);
+        
+        goto again;
+    
+    }
+    
+    if (!((key = hashtab_alloc_name (name)))) {
+    
+        report_at (program_name, 0, REPORT_ERROR, "failed to allocate memory for key");
+        exit (EXIT_FAILURE);
+    
+    }
+    
+    if ((fp = fdopen (fd, "w+b"))) {
+    
+        tmp = xmalloc (sizeof (*tmp));
+        tmp->fp = fp;
+        
+        tmp->path = xstrdup (template);
+        tmp->name = name;
+        
+        hashtab_put (&hashtab_tmpfiles, key, tmp);
+        
+        free (template);
+        return fp;
+    
+    }
+    
+    free (name);
+    free (key);
+    
+    close (fd);
+    
+    remove (template);
+    free (template);
+    
+    return 0;
 
 }
-#elif   defined (_WIN32)
-# include   <windows.h>
+
+int sar_close (FILE *fp) {
+
+    struct hashtab_entry *entry;
+    struct temp_file *tmp;
+    
+    int ret, i;
+    
+    for (i = 0; i < hashtab_tmpfiles.capacity; i++) {
+    
+        if (!(entry = &hashtab_tmpfiles.entries[i])) {
+            continue;
+        }
+        
+        if (!entry->key || !entry->value || entry->value == HASHTAB_TOMBSTONE) {
+            continue;
+        }
+        
+        tmp = (struct temp_file *) entry->value;
+        
+        if (tmp->fp == fp) {
+        
+            if ((ret = fclose (fp))) {
+                return ret;
+            }
+            
+            hashtab_remove (&hashtab_tmpfiles, entry->key);
+            remove (tmp->path);
+            
+            free (tmp->path);
+            free (tmp->name);
+            
+            free (tmp);
+            return 0;
+        
+        }
+    
+    }
+    
+    return 0;
+
+}
+
+void cleanup_tempfiles (void) {
+
+    struct hashtab_entry *entry;
+    struct temp_file *tmp;
+    
+    int ret, i;
+    
+    for (i = 0; i < hashtab_tmpfiles.capacity; i++) {
+    
+        if (!(entry = &hashtab_tmpfiles.entries[i])) {
+            continue;
+        }
+        
+        if (!entry->key || !entry->value || entry->value == HASHTAB_TOMBSTONE) {
+            continue;
+        }
+        
+        tmp = (struct temp_file *) entry->value;
+        
+        if ((ret = fclose (tmp->fp))) {
+            continue;
+        }
+        
+        remove (tmp->path);
+    
+    }
+
+}
+#elif       defined (_WIN32)
+# include       <windows.h>
 
 # ifndef    MAX_PATH
 #  define       MAX_PATH                206
 # endif
 
-FILE *get_temp_file (void) {
+# include       "hashtab.h"
+
+struct temp_file {
+
+    char *name, *path;
+    FILE *fp;
+
+};
+
+static struct hashtab hashtab_tmpfiles = { 0 };
+
+FILE *sar_tmpfile (void) {
 
     char temp_path[MAX_PATH + 1] = { 0 };
     char full_path[MAX_PATH + 1] = { 0 };
+    
+    struct hashtab_name *key;
+    struct temp_file *tmp;
+    
+    char *name, *p;
+    FILE *fp;
     
     if (!GetTempPath (MAX_PATH + 1, temp_path)) {
         return 0;
     }
     
+again:
+    
     if (!GetTempFileName (temp_path, "sar", 0, full_path)) {
         return 0;
     }
     
-    return fopen (full_path, "w+b");
+    if ((p = strrchr (full_path, '\\'))) {
+        name = xstrdup (p + 1);
+    } else {
+        name = xstrdup (full_path);
+    }
+    
+    if ((key = hashtab_get_key (&hashtab_tmpfiles, name))) {
+    
+        free (name);
+        goto again;
+    
+    }
+    
+    if (!((key = hashtab_alloc_name (name)))) {
+    
+        report_at (program_name, 0, REPORT_ERROR, "failed to allocate memory for key");
+        exit (EXIT_FAILURE);
+    
+    }
+    
+    if ((fp = fopen (full_path, "w+b"))) {
+    
+        tmp = xmalloc (sizeof (*tmp));
+        tmp->fp = fp;
+        
+        tmp->path = xstrdup (full_path);
+        tmp->name = name;
+        
+        hashtab_put (&hashtab_tmpfiles, key, tmp);
+        return fp;
+    
+    }
+    
+    free (name);
+    free (key);
+    
+    return 0;
+
+}
+
+int sar_close (FILE *fp) {
+
+    struct hashtab_entry *entry;
+    struct temp_file *tmp;
+    
+    int ret, i;
+    
+    for (i = 0; i < hashtab_tmpfiles.capacity; i++) {
+    
+        if (!(entry = &hashtab_tmpfiles.entries[i])) {
+            continue;
+        }
+        
+        if (!entry->key || !entry->value || entry->value == HASHTAB_TOMBSTONE) {
+            continue;
+        }
+        
+        tmp = (struct temp_file *) entry->value;
+        
+        if (tmp->fp == fp) {
+        
+            if ((ret = fclose (fp))) {
+                return ret;
+            }
+            
+            hashtab_remove (&hashtab_tmpfiles, entry->key);
+            remove (tmp->path);
+            
+            free (tmp->path);
+            free (tmp->name);
+            
+            free (tmp);
+            return 0;
+        
+        }
+    
+    }
+    
+    return 0;
+
+}
+
+void cleanup_tempfiles (void) {
+
+    struct hashtab_entry *entry;
+    struct temp_file *tmp;
+    
+    int ret, i;
+    
+    for (i = 0; i < hashtab_tmpfiles.capacity; i++) {
+    
+        if (!(entry = &hashtab_tmpfiles.entries[i])) {
+            continue;
+        }
+        
+        if (!entry->key || !entry->value || entry->value == HASHTAB_TOMBSTONE) {
+            continue;
+        }
+        
+        tmp = (struct temp_file *) entry->value;
+        
+        if ((ret = fclose (tmp->fp))) {
+            continue;
+        }
+        
+        remove (tmp->path);
+    
+    }
 
 }
 #else
-FILE *get_temp_file (void) {
-    return tmpfile ();
+# include       "hashtab.h"
+
+struct temp_file {
+
+    char *name;
+    FILE *fp;
+
+};
+
+FILE *sar_tmpfile (void) {
+
+    static char name[64] = { 0 };
+    
+    char *temp;
+    unsigned long index, i, j;
+    
+    struct hashtab_name *key;
+    struct temp_file *tmp;
+    
+    FILE *fp;
+    
+    for (i = 0; i < 456976; i++) {
+    
+        sprintf (name, "sar_AAAA.tmp");
+        
+        index = 7;
+        j = i;
+        
+        do {
+        
+            name[index] = (j % 26) + 'A';
+            index--;
+        
+        } while ((j /= 26) > 0);
+        
+        temp = xstrdup (name);
+        
+        if ((key = hashtab_get_key (&hashtab_tmpfiles, temp))) {
+        
+            free (temp);
+            continue;
+        
+        }
+        
+        if ((fp = fopen (temp, "rb"))) {
+        
+            fclose (fp);
+            
+            free (temp);
+            continue;
+        
+        }
+        
+        if (!((key = hashtab_alloc_name (temp)))) {
+        
+            report_at (program_name, 0, REPORT_ERROR, "failed to allocate memory for key");
+            exit (EXIT_FAILURE);
+        
+        }
+        
+        if ((fp = fopen (temp, "w+b"))) {
+            
+            tmp = xmalloc (sizeof (*tmp));
+            
+            tmp->name = temp;
+            tmp->fp = fp;
+        
+            hashtab_put (&hashtab_tmpfiles, key, tmp);
+            return fp;
+        
+        }
+        
+        free (temp);
+        free (key);
+    
+    }
+    
+    return 0;
+
+}
+
+int sar_close (FILE *fp) {
+
+    struct hashtab_entry *entry;
+    struct temp_file *tmp;
+    
+    int ret, i;
+    
+    for (i = 0; i < hashtab_tmpfiles.capacity; i++) {
+    
+        if (!(entry = &hashtab_tmpfiles.entries[i])) {
+            continue;
+        }
+        
+        if (!entry->key || !entry->value || entry->value == HASHTAB_TOMBSTONE) {
+            continue;
+        }
+        
+        tmp = (struct temp_file *) entry->value;
+        
+        if (tmp->fp == fp) {
+        
+            if ((ret = fclose (fp))) {
+                return ret;
+            }
+            
+            hashtab_remove (&hashtab_tmpfiles, entry->key);
+            remove (tmp->name);
+            
+            free (tmp->name);
+            free (tmp);
+            
+            return 0;
+        
+        }
+    
+    }
+    
+    return 0;
+
+}
+
+void cleanup_tempfiles (void) {
+
+    struct hashtab_entry *entry;
+    struct temp_file *tmp;
+    
+    int ret, i;
+    
+    for (i = 0; i < hashtab_tmpfiles.capacity; i++) {
+    
+        if (!(entry = &hashtab_tmpfiles.entries[i])) {
+            continue;
+        }
+        
+        if (!entry->key || !entry->value || entry->value == HASHTAB_TOMBSTONE) {
+            continue;
+        }
+        
+        tmp = (struct temp_file *) entry->value;
+        
+        if ((ret = fclose (tmp->fp))) {
+            continue;
+        }
+        
+        remove (tmp->name);
+    
+    }
+
 }
 #endif

@@ -4,7 +4,7 @@
 SRCDIR              ?=  $(CURDIR)
 VPATH               :=  $(SRCDIR)
 
-SRC                 :=  append.c ar.c conv.c delete.c display.c extract.c lib.c ranlib.c replace.c report.c
+SRC                 :=  append.c ar.c conv.c delete.c display.c extract.c hashtab.c lib.c ranlib.c replace.c report.c
 
 all: sar.exe
 

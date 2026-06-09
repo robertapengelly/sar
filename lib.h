@@ -16,6 +16,10 @@ void *xmalloc (unsigned long __size);
 void *xrealloc (void *__ptr, unsigned long __size);
 
 #include    <stdio.h>
-FILE *get_temp_file (void);
+
+FILE *sar_tmpfile (void);
+int sar_close (FILE *fp);
+
+void cleanup_tempfiles (void);
 
 #endif      /* _LIB_H */

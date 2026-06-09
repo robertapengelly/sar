@@ -7,7 +7,7 @@ VPATH               :=  $(SRCDIR)
 CC                  :=  gcc
 CFLAGS              :=  -D_FILE_OFFSET_BITS=64 -O2 -Wall -Werror -Wextra
 
-CSRC                :=  append.c ar.c conv.c delete.c display.c extract.c lib.c ranlib.c replace.c report.c
+CSRC                :=  append.c ar.c conv.c delete.c display.c extract.c hashtab.c lib.c ranlib.c replace.c report.c
 
 all: sar.exe
 

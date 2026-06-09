@@ -11,17 +11,25 @@
 
 void replace (FILE *arfp, const char *fname) {
 
-    FILE *tfp = get_temp_file ();
     long bytes, len, read;
     
     const char *name;
     char temp[17], *p, *contents;
     
+    FILE *tfp;
+    
+    if (!(tfp = sar_tmpfile ())) {
+    
+        report_at (program_name, 0, REPORT_ERROR, "failed to create temp file");
+        return;
+    
+    }
+    
     if (fwrite ("!<arch>\n", 8, 1, tfp) != 1) {
     
-        fclose (tfp);
-        
         report_at (program_name, 0, REPORT_ERROR, "failed whilst writing ar header");
+        
+        sar_close (tfp);
         return;
     
     }
@@ -83,9 +91,9 @@ void replace (FILE *arfp, const char *fname) {
         
         if (fwrite (&hdr, sizeof (hdr), 1, tfp) != 1) {
         
-            fclose (tfp);
-            
             report_at (program_name, 0, REPORT_ERROR, "failed whilst writing header");
+            
+            sar_close (tfp);
             exit (EXIT_FAILURE);
         
         }
@@ -104,9 +112,9 @@ void replace (FILE *arfp, const char *fname) {
             
             if (fread (contents, read, 1, arfp) != 1) {
             
-                free (contents);
-                
                 report_at (program_name, 0, REPORT_ERROR, "failed to read %ld bytes from %s", bytes, state->outfile);
+                
+                free (contents);
                 exit (EXIT_FAILURE);
             
             }
@@ -114,10 +122,10 @@ void replace (FILE *arfp, const char *fname) {
             bytes -= read;
             
             if (fwrite (contents, read, 1, tfp) != 1) {
-            
-                free (contents);
                 
                 report_at (program_name, 0, REPORT_ERROR, "failed to write temp file");
+                
+                free (contents);
                 exit (EXIT_FAILURE);
             
             }
@@ -140,9 +148,9 @@ void replace (FILE *arfp, const char *fname) {
     
     if ((arfp = fopen (state->outfile, "w+b")) == NULL) {
     
-        fclose (tfp);
-        
         report_at (program_name, 0, REPORT_ERROR, "failed to open %s", state->outfile);
+        
+        sar_close (tfp);
         exit (EXIT_FAILURE);
     
     }
@@ -165,10 +173,11 @@ void replace (FILE *arfp, const char *fname) {
         
         if (fread (contents, read, 1, tfp) != 1) {
             
-            free (contents);
-            fclose (tfp);
-            
             report_at (program_name, 0, REPORT_ERROR, "failed whilst reading temp file");
+            
+            sar_close (tfp);
+            free (contents);
+            
             return;
         
         }
@@ -177,17 +186,18 @@ void replace (FILE *arfp, const char *fname) {
         
         if (fwrite (contents, read, 1, arfp) != 1) {
         
-            free (contents);
-            fclose (tfp);
-            
             report_at (program_name, 0, REPORT_ERROR, "failed whilst writing %s", state->outfile);
+            
+            sar_close (tfp);
+            free (contents);
+            
             exit (EXIT_FAILURE);
         
         }
     
     }
     
+    sar_close (tfp);
     free (contents);
-    fclose (tfp);
 
 }

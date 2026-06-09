@@ -25,6 +25,8 @@ static void cleanup (void) {
         }
     
     }
+    
+    cleanup_tempfiles ();
 
 }
 
