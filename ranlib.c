@@ -3,6 +3,7 @@
  *****************************************************************************/
 #include    <limits.h>
 #include    <stddef.h>
+#include    <stdint.h>
 #include    <stdio.h>
 #include    <stdlib.h>
 #include    <string.h>
@@ -15,7 +16,6 @@
 #include    "lib.h"
 #include    "macho.h"
 #include    "report.h"
-#include    "stdint.h"
 
 struct strtab {
 
@@ -284,12 +284,7 @@ static void elf64_get_symbols (void *object, int64_t offset, int endianess) {
     
     uint16_t e_shnum = array_to_integer (hdr->e_shnum, 2, endianess);
     uint16_t e_shentsize = array_to_integer (hdr->e_shentsize, 2, endianess);
-    
-#if     defined (NO_LONG_LONG)
-    uint64_t e_shoff = array_to_integer (hdr->e_shoff, 4, endianess);
-#else
     uint64_t e_shoff = array_to_integer (hdr->e_shoff, 8, endianess);
-#endif
     
     uint64_t sh_link, sh_offset, sh_entsize, sh_size;
     uint64_t sym_strtab_size, i, j, st_name;
@@ -310,12 +305,7 @@ static void elf64_get_symbols (void *object, int64_t offset, int endianess) {
         }
         
         sh_link = array_to_integer (shdr.sh_link, 4, endianess);
-        
-#if     defined (NO_LONG_LONG)
-        sh_offset = array_to_integer (shdr.sh_offset, 4, endianess);
-#else
         sh_offset = array_to_integer (shdr.sh_offset, 8, endianess);
-#endif
         
         if (sh_link == 0 || sh_link >= e_shnum) {
             continue;
@@ -327,16 +317,6 @@ static void elf64_get_symbols (void *object, int64_t offset, int endianess) {
             continue;
         }
         
-#if     defined (NO_LONG_LONG)
-        sym_strtab_size = array_to_integer (strtabhdr.sh_size, 4, endianess);
-        sym_strtab = (char *) object + array_to_integer (strtabhdr.sh_offset, 4, endianess);
-        
-        if ((sh_entsize = array_to_integer (shdr.sh_entsize, 4, endianess)) < sizeof (elf_symbol)) {
-            continue;
-        }
-        
-        sh_size = array_to_integer (shdr.sh_size, 4, endianess);
-#else
         sym_strtab_size = array_to_integer (strtabhdr.sh_size, 8, endianess);
         sym_strtab = (char *) object + array_to_integer (strtabhdr.sh_offset, 8, endianess);
         
@@ -345,7 +325,6 @@ static void elf64_get_symbols (void *object, int64_t offset, int endianess) {
         }
         
         sh_size = array_to_integer (shdr.sh_size, 8, endianess);
-#endif
         
         for (j = 1; j < sh_size / sh_entsize; j++) {
         

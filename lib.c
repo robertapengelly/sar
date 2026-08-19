@@ -8,6 +8,7 @@
 #endif
 
 #include    <limits.h>
+#include    <stdint.h>
 #include    <stdio.h>
 #include    <stdlib.h>
 #include    <string.h>
@@ -15,7 +16,6 @@
 #include    "ar.h"
 #include    "lib.h"
 #include    "report.h"
-#include    "stdint.h"
 
 static void print_usage (void) {
 

@@ -4,7 +4,7 @@
 #ifndef     _LIB_H
 #define     _LIB_H
 
-#include    "stdint.h"
+#include    <stdint.h>
 
 char *xstrdup (const char *__p);
 char *xstrndup (const char *__p, unsigned long __size);
