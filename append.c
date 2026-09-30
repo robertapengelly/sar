@@ -11,13 +11,11 @@
 
 void append (FILE *ofp, const char *fname) {
 
+    struct ar_header header;
     FILE *tfp;
     
-    struct ar_header header;
-    char temp[17];
-    
-    const char *name = fname;
-    char *p, *contents;
+    const char *name = fname, *p;
+    char *contents, temp[17];
     
     int need_newline = 0;
     long bytes, len, read;

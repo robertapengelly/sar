@@ -13,8 +13,8 @@ void delete (FILE *arfp, const char *fname) {
 
     long bytes, len, read;
     
-    const char *name;
-    char temp[17], *p, *contents;
+    const char *name, *p;
+    char *contents, temp[17];
     
     FILE *tfp;
     
